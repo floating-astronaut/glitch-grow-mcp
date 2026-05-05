@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
@@ -22,7 +23,23 @@ from .middleware import BearerAuthMiddleware
 
 log = logging.getLogger("glitch_grow_mcp")
 
-mcp = FastMCP("glitch-grow-mcp")
+# DNS rebinding protection: allow the public hostname through nginx in
+# addition to the default localhost entries. Extend this list when adding
+# more public hostnames.
+mcp = FastMCP(
+    "glitch-grow-mcp",
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=[
+            "127.0.0.1:*", "localhost:*", "[::1]:*",
+            "mcp.glitchexecutor.com",
+        ],
+        allowed_origins=[
+            "http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*",
+            "https://mcp.glitchexecutor.com",
+        ],
+    ),
+)
 
 
 # ---- helpers ---------------------------------------------------------------
