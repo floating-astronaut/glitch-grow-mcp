@@ -1,0 +1,21 @@
+{
+  "id": "ayurpet",
+  "display_name": "Ayurpet",
+  "enabled": true,
+  "shopify_shops": [
+    "1ygbmd-pr.myshopify.com",
+    "2684sq-mt.myshopify.com"
+  ],
+  "meta_ad_accounts": [
+    "act_654879327196107"
+  ],
+  "amazon_profile_ids": [],
+  "tiktok_advertiser_ids": [],
+  "google_ads_customer_ids": [],
+  "linkedin_ad_accounts": [],
+  "ads_agent_brand": "ayurpet",
+  "social_agent_brand": "ayurpet",
+  "meta": {
+    "notes": "Ayurpet family — India storefront 1ygbmd-pr + Global storefront 2684sq-mt share Meta ad acc act_654879327196107 (INR). Add Amazon/TikTok/Google IDs here when those connections come online."
+  }
+}

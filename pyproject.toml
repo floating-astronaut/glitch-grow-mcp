@@ -1,0 +1,38 @@
+[project]
+name = "glitch-grow-mcp"
+version = "0.1.0"
+description = "Multi-tenant MCP server that exposes Glitch Grow ads + social agent capabilities to client Claude Code installs, scoped per tenant"
+requires-python = ">=3.11"
+readme = "README.md"
+
+dependencies = [
+  "mcp[cli]>=1.2",
+  "uvicorn[standard]>=0.32",
+  "starlette>=0.41",
+  "httpx>=0.27",
+  "pydantic>=2.9",
+  "pydantic-settings>=2.6",
+  "python-dotenv>=1.0",
+  "structlog>=24.4",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "ruff>=0.7",
+]
+
+[project.scripts]
+glitch-grow-mcp = "glitch_grow_mcp.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/glitch_grow_mcp"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

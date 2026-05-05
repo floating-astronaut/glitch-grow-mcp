@@ -1,0 +1,14 @@
+{
+  "id": "<short-id-no-spaces>",
+  "display_name": "<Pretty Name>",
+  "enabled": true,
+  "shopify_shops": ["<shop>.myshopify.com"],
+  "meta_ad_accounts": ["act_<id>"],
+  "amazon_profile_ids": ["<profile_id>"],
+  "tiktok_advertiser_ids": ["<advertiser_id>"],
+  "google_ads_customer_ids": ["<customer_id>"],
+  "linkedin_ad_accounts": ["<account_id>"],
+  "ads_agent_brand": "<brand-key-as-known-to-ads-agent>",
+  "social_agent_brand": "<brand-key-as-known-to-social-agent>",
+  "meta": {"notes": "free-form, not used by code"}
+}
