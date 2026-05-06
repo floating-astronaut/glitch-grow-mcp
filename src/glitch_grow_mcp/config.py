@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     port: int = Field(3106, alias="GGM_PORT")
 
     ads_agent_base_url: str = Field("http://127.0.0.1:3110", alias="ADS_AGENT_BASE_URL")
+    # Shared-secret bearer the ads-agent expects on /agent/run (admin-gated endpoint).
+    ads_agent_run_token: str | None = Field(None, alias="AGENT_RUN_TOKEN")
     meta_ads_mcp_url: str = Field("http://127.0.0.1:3103", alias="META_ADS_MCP_URL")
     amazon_ads_mcp_url: str = Field("http://127.0.0.1:3105", alias="AMAZON_ADS_MCP_URL")
 

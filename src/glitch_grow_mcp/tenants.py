@@ -37,6 +37,11 @@ class TenantConfig(BaseModel):
     ads_agent_brand: str | None = None
     social_agent_brand: str | None = None
 
+    # The ads agent dispatches per `store_slug` (one slug = one storefront).
+    # List the slugs this tenant is allowed to drive; the bridge rejects
+    # any call whose store_slug isn't in this set.
+    ads_agent_store_slugs: list[str] = Field(default_factory=list)
+
     # Free-form metadata (notes, contacts, etc.). Not used by code.
     meta: dict[str, Any] = Field(default_factory=dict)
 

@@ -72,6 +72,7 @@ def whoami() -> dict:
         "linkedin_ad_accounts": t.linkedin_ad_accounts,
         "ads_agent_brand": t.ads_agent_brand,
         "social_agent_brand": t.social_agent_brand,
+        "ads_agent_store_slugs": t.ads_agent_store_slugs,
     }
     _audit("whoami", {}, "ok")
     return out
@@ -81,22 +82,64 @@ def whoami() -> dict:
 
 
 @mcp.tool()
-async def ads_agent_run(instruction: str, context: dict | None = None) -> dict:
-    """Send a natural-language instruction to the Glitch Grow ads agent for this tenant.
+async def ads_agent_run(command: str, store_slug: str, kwargs: dict | None = None) -> dict:
+    """Run a typed command on the Glitch Grow ads agent for one of your storefronts.
 
-    The ads agent already plans/analyses/executes across Meta, Amazon, TikTok,
-    Google, LinkedIn and Shopify for the brand. Updates to the agent are picked
-    up automatically on the next call (no MCP redeploy).
+    Args:
+      command: one of the agent's commands — e.g. `insights`, `roas`,
+        `ads`, `creative`, `meta_audit`, `tiktok_campaigns`, `amazon`,
+        `port_meta_to_tiktok`, etc. Use `ads_agent_list_commands` to see
+        the canonical list.
+      store_slug: which of your storefronts to act on (e.g. `ayurpet-ind`,
+        `ayurpet`). Must be in your tenant's allowlist — see `whoami`.
+      kwargs: per-command fields. Common ones: `days` (lookback window),
+        `limit` (top-N), `ad_id`, `campaign_id`, `campaign_status`,
+        `budget`. Unknown fields are passed through.
+
+    Returns the agent's `{reply, state}` dict.
     """
     t = require_tenant()
-    args = {"instruction": instruction, "context": context}
+    args = {"command": command, "store_slug": store_slug, "kwargs": kwargs}
     try:
-        result = await AdsAgentBridge(t).run(instruction, context)
+        result = await AdsAgentBridge(t).run(command, store_slug, kwargs)
         _audit("ads_agent_run", args, "ok")
         return result
     except Exception as e:
         _audit("ads_agent_run", args, "error", repr(e))
         raise
+
+
+@mcp.tool()
+def ads_agent_list_commands() -> dict:
+    """List the canonical commands accepted by `ads_agent_run`.
+
+    The agent is a typed dispatcher (LangGraph router), not a natural-
+    language interface. Use this list to pick a `command`. New commands
+    the agent ships work automatically without a MCP redeploy — this
+    list is just a snapshot for discoverability.
+    """
+    from .bridges.ads_agent import KNOWN_COMMANDS
+    t = require_tenant()
+    out = {
+        "commands": list(KNOWN_COMMANDS),
+        "your_store_slugs": t.ads_agent_store_slugs,
+        "common_kwargs": {
+            "days": "int — lookback window (most read commands)",
+            "limit": "int — top-N (ads_leaderboard, etc.)",
+            "ad_id": "str — for ad-level commands",
+            "campaign_id": "str — for campaign-level commands",
+            "campaign_status": "str — ACTIVE / PAUSED",
+            "budget": "float — for budget updates",
+        },
+        "examples": [
+            {"command": "insights", "store_slug": "<your-slug>", "kwargs": {"days": 7}},
+            {"command": "roas", "store_slug": "<your-slug>", "kwargs": {"days": 14}},
+            {"command": "ads", "store_slug": "<your-slug>", "kwargs": {"days": 7, "limit": 10}},
+            {"command": "meta_audit", "store_slug": "<your-slug>"},
+        ],
+    }
+    _audit("ads_agent_list_commands", {}, "ok")
+    return out
 
 
 @mcp.tool()

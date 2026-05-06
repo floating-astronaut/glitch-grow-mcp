@@ -15,6 +15,10 @@
   "linkedin_ad_accounts": [],
   "ads_agent_brand": "ayurpet",
   "social_agent_brand": "ayurpet",
+  "ads_agent_store_slugs": [
+    "ayurpet-ind",
+    "ayurpet"
+  ],
   "meta": {
     "notes": "Ayurpet family — India storefront 1ygbmd-pr + Global storefront 2684sq-mt share Meta ad acc act_654879327196107 (INR). Add Amazon/TikTok/Google IDs here when those connections come online."
   }
