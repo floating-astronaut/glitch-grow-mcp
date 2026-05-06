@@ -10,7 +10,10 @@ Group=support
 WorkingDirectory=/home/support/glitch-grow-mcp
 EnvironmentFile=-/home/support/glitch-grow-mcp/.env
 ExecStart=/home/support/glitch-grow-mcp/.venv/bin/glitch-grow-mcp serve
-Restart=on-failure
+# Restart on ANY exit (clean or failure). On 2026-05-05 the service was
+# stopped by a system-wide SIGTERM event and Restart=on-failure left it
+# down, causing client-facing 502s. always = no silent dead service.
+Restart=always
 RestartSec=3
 StandardOutput=journal
 StandardError=journal
