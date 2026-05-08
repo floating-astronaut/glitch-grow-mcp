@@ -37,6 +37,8 @@ mcp = FastMCP(
         allowed_origins=[
             "http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*",
             "https://mcp.glitchexecutor.com",
+            # Web clients that need to reach this MCP from a browser context.
+            "https://claude.ai", "https://*.claude.ai",
         ],
     ),
 )
