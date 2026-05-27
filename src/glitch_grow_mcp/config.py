@@ -34,6 +34,22 @@ class Settings(BaseSettings):
 
     log_level: str = Field("INFO", alias="GGM_LOG_LEVEL")
 
+    # MCP-5 (2026-05-27): cockpit-proxy backend.
+    #
+    # `cockpit_base_url` is the FQDN this MCP server points its
+    # /v1/control/* proxy calls at. Defaults to production. Override
+    # to http://127.0.0.1:3113 when running both services on the same
+    # box (faster + avoids the public TLS hop).
+    cockpit_base_url: str = Field(
+        "https://meshpilot.app", alias="GGM_COCKPIT_BASE_URL"
+    )
+    # `cockpit_internal_token` is the shared bearer this MCP presents
+    # to the cockpit via `X-Internal-Token`. Must equal the cockpit's
+    # `INTERNAL_API_TOKEN`. Rotated out-of-band — never logged.
+    cockpit_internal_token: str | None = Field(
+        None, alias="GGM_COCKPIT_INTERNAL_TOKEN"
+    )
+
     @property
     def tokens_db_path(self) -> Path:
         return self.data_dir / "tokens.sqlite"

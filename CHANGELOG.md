@@ -11,9 +11,18 @@ Body text (if present) shown as indented sub-bullets.
 
 ---
 
+## 2026-05-27
+
+- **06:47 UTC** — auto-sync: 2026-05-27 06:47 UTC (`7d6be3e`) — 6 files
+        A	src/glitch_grow_mcp/bridges/control_plane.py
+        M	src/glitch_grow_mcp/config.py
+        M	src/glitch_grow_mcp/server.py
+        M	src/glitch_grow_mcp/tenants.py
+        M	tenants/ayurpet.json
+
 ## 2026-05-16
 
-- **02:46 UTC** — Allow browser MCP clients (claude.ai) — Origin allowlist, OAuth-discovery 404, WWW-Authenticate (`89c9196`) — 3 files
+- **03:02 UTC** — Allow browser MCP clients (claude.ai) — Origin allowlist, OAuth-discovery 404, WWW-Authenticate (`0f8e5fb`) — 3 files
     When a teammate tried to connect this MCP from the Claude.ai web client,
     the access log showed three signals the server wasn't presenting itself
     the way browser-based MCP clients expect:

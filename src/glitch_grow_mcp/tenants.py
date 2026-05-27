@@ -37,6 +37,25 @@ class TenantConfig(BaseModel):
     ads_agent_brand: str | None = None
     social_agent_brand: str | None = None
 
+    # MCP-5 (2026-05-27): cockpit-proxy identity.
+    #
+    # `actor_email` is the cockpit user whose `core.user_brands` row
+    # authorizes any control-plane action this tenant stages through
+    # the MCP gateway. The cockpit's POST /v1/control/actions (and
+    # /automation-rules) requires `actor_email` in the body and
+    # verifies it has operator role on the target brand. By stamping
+    # it from the tenant config rather than letting the MCP client
+    # supply it, we prevent an external client from impersonating
+    # other operators.
+    actor_email: str | None = None
+
+    # `cockpit_brand_ids` is a defense-in-depth allowlist of brand_ids
+    # this tenant may target through control-plane tools. The cockpit
+    # re-verifies against `core.user_brands`, so this is NOT the auth
+    # boundary — it's just an early reject so an MCP client targeting
+    # the wrong brand gets a clearer error.
+    cockpit_brand_ids: list[str] = Field(default_factory=list)
+
     # The ads agent dispatches per `store_slug` (one slug = one storefront).
     # List the slugs this tenant is allowed to drive; the bridge rejects
     # any call whose store_slug isn't in this set.

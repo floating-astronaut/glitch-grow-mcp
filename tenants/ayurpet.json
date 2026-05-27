@@ -19,7 +19,12 @@
     "ayurpet-ind",
     "ayurpet"
   ],
+  "actor_email": "care@ayurpet.com",
+  "cockpit_brand_ids": [
+    "ayurpet"
+  ],
   "meta": {
-    "notes": "Ayurpet family — India storefront 1ygbmd-pr + Global storefront 2684sq-mt share Meta ad acc act_654879327196107 (INR). Add Amazon/TikTok/Google IDs here when those connections come online."
+    "notes": "Ayurpet family — India storefront 1ygbmd-pr + Global storefront 2684sq-mt share Meta ad acc act_654879327196107 (INR). Add Amazon/TikTok/Google IDs here when those connections come online.",
+    "mcp_6_cutover": "2026-05-27: added actor_email + cockpit_brand_ids for the new control-plane proxy tools (stage_action, etc.). care@ayurpet.com has operator role on 'ayurpet' in core.user_brands; the cockpit will reject any MCP stage attempt that targets a brand outside that allowlist."
   }
 }

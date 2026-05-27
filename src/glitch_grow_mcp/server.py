@@ -17,6 +17,7 @@ from .bridges import (
     MetaAdsBridge,
     SocialAgentBridge,
 )
+from .bridges.control_plane import ControlPlaneBridge, ControlPlaneError
 from .config import get_settings
 from .context import current_token_hash, require_tenant
 from .middleware import BearerAuthMiddleware
@@ -233,6 +234,238 @@ async def amazon_ads_call(tool: str, args: dict | None = None) -> Any:
     except Exception as e:
         _audit("amazon_ads_call", call_args, "error", repr(e))
         raise
+
+
+# ---- control plane (cockpit proxy — MCP-5, 2026-05-27) --------------------
+#
+# These tools are the PRIMARY surface for the MCP-first product pivot
+# (docs/plans/2026-05-27-byo-ai-mcp-dashboard-pivot.md). They proxy to
+# the cockpit's /v1/control/* endpoints, which write to the canonical
+# core.agent_actions / core.automation_rules tables and fan out
+# notifications via the MCP-2 path.
+#
+# An external AI client (Claude.ai, Cursor, ChatGPT) only needs these
+# tools to make real ongoing work land in the operator's cockpit
+# inbox + Slack/Discord/email mirrors. The legacy per-platform bridges
+# above are kept for backward compat with already-deployed tenants;
+# new tenants should use these.
+
+
+def _audit_cp(tool: str, args: dict, status: str, detail: str | None = None) -> None:
+    """Same audit shape as `_audit` but tagged with `cp:` so the
+    audit log can distinguish control-plane proxy calls from the
+    legacy platform-bridge calls."""
+    _audit(f"cp:{tool}", args, status, detail)
+
+
+@mcp.tool()
+async def stage_action(
+    brand_id: str,
+    action_type: str,
+    title: str,
+    summary: str | None = None,
+    agent_sku: str | None = None,
+    idempotency_key: str | None = None,
+    payload: dict | None = None,
+) -> dict:
+    """Stage a pending action in the operator's cockpit inbox.
+
+    Use this when you want the operator to APPROVE something material
+    (pause a campaign, draft a post, kick off outreach) rather than
+    just answering a question. The action lands in `core.agent_actions`
+    with `source='mcp'` and stays `pending` until the operator decides
+    on it in the cockpit.
+
+    Args:
+      brand_id: Which brand the action targets. Must be one of this
+        tenant's `cockpit_brand_ids` AND the tenant's actor_email must
+        have operator role on it in `core.user_brands`.
+      action_type: Short verb-y identifier, e.g. `pause_meta_campaign`,
+        `request_creative_refresh`, `draft_social_post`. Per-agent
+        watchers pick up by this string.
+      title: One-line summary that renders as the inbox-card title.
+      summary: Optional longer rationale.
+      agent_sku: Optional. Which agent should pick this up
+        (BSK-002 Ads, BSK-003 Sales, BSK-004 Social, BSK-005 Voice,
+        BSK-006 SEO, BSK-007 UGC). Defaults to BSK-MCP.
+      idempotency_key: Optional. 24h dedupe — pass a stable key
+        (e.g. the conversation turn id) so retries don't create
+        duplicate rows.
+      payload: Optional structured fields for downstream agents.
+
+    Returns the cockpit's response with the new row's id.
+    """
+    t = require_tenant()
+    call_args = {
+        "brand_id": brand_id, "action_type": action_type, "title": title,
+        "summary": summary, "agent_sku": agent_sku,
+        "idempotency_key": idempotency_key, "payload": payload,
+    }
+    try:
+        result = await ControlPlaneBridge(t).stage_action(
+            brand_id=brand_id,
+            action_type=action_type,
+            title=title,
+            summary=summary,
+            agent_sku=agent_sku,
+            idempotency_key=idempotency_key,
+            payload=payload,
+        )
+        _audit_cp("stage_action", call_args, "ok")
+        return result
+    except ControlPlaneError as e:
+        _audit_cp("stage_action", call_args, "error", repr(e))
+        return {
+            "error": "control_plane_error",
+            "message": str(e),
+            "status_code": e.status_code,
+            "detail": e.detail,
+        }
+
+
+@mcp.tool()
+async def list_actions(
+    brand_id: str,
+    action_status: str | None = None,
+    limit: int = 25,
+) -> dict:
+    """List MCP-staged actions for one of this tenant's brands.
+
+    Filters to `source='mcp'` automatically — this is the tenant's own
+    staged work, not the full cockpit inbox. The cockpit also has rows
+    from Ask, internal agents, and the cockpit UI; those are not
+    surfaced here.
+
+    Args:
+      brand_id: Brand to read.
+      action_status: Optional. `pending | approved | rejected |
+        executing | done | failed`. Defaults to all statuses.
+      limit: Max rows (default 25, cockpit caps at 200).
+    """
+    t = require_tenant()
+    call_args = {"brand_id": brand_id, "status": action_status, "limit": limit}
+    try:
+        result = await ControlPlaneBridge(t).list_actions(
+            brand_id=brand_id, action_status=action_status, limit=limit,
+        )
+        _audit_cp("list_actions", call_args, "ok")
+        return result
+    except ControlPlaneError as e:
+        _audit_cp("list_actions", call_args, "error", repr(e))
+        return {
+            "error": "control_plane_error",
+            "message": str(e),
+            "status_code": e.status_code,
+            "detail": e.detail,
+        }
+
+
+@mcp.tool()
+async def stage_automation_rule(
+    brand_id: str,
+    title: str,
+    action_kind: str,
+    schedule_expression: str,
+    config: dict | None = None,
+    next_run_at: str | None = None,
+) -> dict:
+    """Stage a recurring automation rule.
+
+    Lands in `core.automation_rules` with `source='mcp'` and
+    `status='draft'` (forced by the cockpit — external clients cannot
+    auto-arm recurring work). The operator promotes the draft to
+    active via the cockpit's automations page.
+
+    Args:
+      brand_id: Which brand the rule targets.
+      title: Human-readable summary; renders on the cockpit
+        automations page.
+      action_kind: Free-form identifier matching what the
+        automation_runner worker dispatches (`ads_review`,
+        `signal_post_draft`, etc.).
+      schedule_expression: Cron string or ISO 8601 duration. Opaque
+        text — runner parses it.
+      config: Free-form JSONB stored on the rule; the runner reads it
+        to know HOW to execute.
+      next_run_at: ISO 8601 timestamp for the first run.
+
+    Returns the cockpit's response with the new rule's uuid.
+    """
+    t = require_tenant()
+    call_args = {
+        "brand_id": brand_id, "title": title,
+        "action_kind": action_kind,
+        "schedule_expression": schedule_expression,
+        "config": config, "next_run_at": next_run_at,
+    }
+    try:
+        result = await ControlPlaneBridge(t).stage_automation_rule(
+            brand_id=brand_id,
+            title=title,
+            action_kind=action_kind,
+            schedule_expression=schedule_expression,
+            config=config,
+            next_run_at=next_run_at,
+        )
+        _audit_cp("stage_automation_rule", call_args, "ok")
+        return result
+    except ControlPlaneError as e:
+        _audit_cp("stage_automation_rule", call_args, "error", repr(e))
+        return {
+            "error": "control_plane_error",
+            "message": str(e),
+            "status_code": e.status_code,
+            "detail": e.detail,
+        }
+
+
+@mcp.tool()
+async def list_automation_rules(
+    brand_id: str,
+    rule_status: str | None = None,
+    limit: int = 25,
+) -> dict:
+    """List MCP-staged automation rules for one of this tenant's
+    brands. Filters to `source='mcp'`."""
+    t = require_tenant()
+    call_args = {"brand_id": brand_id, "status": rule_status, "limit": limit}
+    try:
+        result = await ControlPlaneBridge(t).list_automation_rules(
+            brand_id=brand_id, rule_status=rule_status, limit=limit,
+        )
+        _audit_cp("list_automation_rules", call_args, "ok")
+        return result
+    except ControlPlaneError as e:
+        _audit_cp("list_automation_rules", call_args, "error", repr(e))
+        return {
+            "error": "control_plane_error",
+            "message": str(e),
+            "status_code": e.status_code,
+            "detail": e.detail,
+        }
+
+
+@mcp.tool()
+def whoami_cockpit() -> dict:
+    """Return what brands + identity THIS tenant has on the cockpit
+    side. Useful at the start of a conversation so the AI client
+    knows which `brand_id` values are valid.
+
+    Distinct from `whoami` (above), which returns the legacy
+    per-platform scopes (Shopify shops, Meta accounts, Amazon
+    profiles). The control-plane proxy only cares about the
+    cockpit-side identity.
+    """
+    t = require_tenant()
+    out = {
+        "tenant_id": t.id,
+        "display_name": t.display_name,
+        "actor_email": t.actor_email,
+        "cockpit_brand_ids": t.cockpit_brand_ids,
+        "ready": bool(t.actor_email and (t.cockpit_brand_ids or True)),
+    }
+    _audit_cp("whoami_cockpit", {}, "ok")
+    return out
 
 
 # ---- ASGI app --------------------------------------------------------------
